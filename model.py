@@ -15,6 +15,7 @@ import numpy as np
 
 from activation import sigmoid, sigmoid_derivative
 from loss import square_loss, square_loss_derivative
+from regularization import regularization
 
 
 class NnModel:
@@ -86,11 +87,13 @@ class NnModel:
 
         return loss
 
-    def _backward(self, X, y):
+    def _backward(self, X, y, regularization_option="l2", alpha=0.3):
         """Backward function of nn model
 
         :param X:
         :param y:
+        :param regularization_option: mode of regularization,
+               "l2" means l2-regularization, "l1" means l1-regularization.
         :return: True if there is no error, else False.
         """
         if self._output_layer.shape != y.shape:
@@ -109,8 +112,11 @@ class NnModel:
 
         d_loss_d_hidden_layer_w = np.dot(X.T, d_loss_d_hidden_layer_before_activation)
 
-        self._output_layer_w -= self._learning_rate * d_loss_d_output_layer_w
-        self._hidden_layer_w -= self._learning_rate * d_loss_d_hidden_layer_w
+        regularization_output_layer_w = regularization(self._output_layer_w, regularization_option)
+        regularization_hidden_layer_w = regularization(self._hidden_layer_w, regularization_option)
+
+        self._output_layer_w -= self._learning_rate * (d_loss_d_output_layer_w + alpha * regularization_output_layer_w)
+        self._hidden_layer_w -= self._learning_rate * (d_loss_d_hidden_layer_w + alpha * regularization_hidden_layer_w)
 
         return True
 
@@ -158,7 +164,7 @@ class NnModel:
                 print("fit: _comput_loss wrong")
                 return False
 
-            if not self._backward(X_train, y_train):
+            if not self._backward(X_train, y_train, regularization_option="l1"):
                 print("fit: _backward wrong")
                 return False
 
