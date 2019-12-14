@@ -47,34 +47,44 @@ class NnModel:
             "backward": square_loss_derivative
         }
 
-    def _forward(self, X):
+    def _forward(self, X, train=True):
         """Forward function of nn model, which computes the output of the nn model.
 
         :param X: array of shape [-1, self._input_dim]
-        :return: True if there is no error, else False.
+        :param train: mode of forward, False means it is in the mode of validation.
+        :return: output_layer, the result of forwarding.
         """
         if X.shape[1] != self._input_dim:
             print("_forward: input array dimension error")
-            return False
-        self._hidden_layer_before_activation = np.dot(X, self._hidden_layer_w)
-        self._hidden_layer = self._activation_func_list["forward"](self._hidden_layer_before_activation)
-        self._output_layer_before_activation = np.dot(self._hidden_layer, self._output_layer_w)
-        self._output_layer = self._activation_func_list["forward"](self._output_layer_before_activation)
+            return None
 
-        return True
+        hidden_layer_before_activation = np.dot(X, self._hidden_layer_w)
+        hidden_layer = self._activation_func_list["forward"](hidden_layer_before_activation)
+        output_layer_before_activation = np.dot(hidden_layer, self._output_layer_w)
+        output_layer = self._activation_func_list["forward"](output_layer_before_activation)
+
+        if train:
+            self._hidden_layer_before_activation = hidden_layer_before_activation
+            self._hidden_layer = hidden_layer
+            self._output_layer_before_activation = output_layer_before_activation
+            self._output_layer = output_layer
+
+        return output_layer
 
     def _compute_loss(self, output, y):
         """Compute loss
 
         :param output: the output of nn model.
+        :param y: labels
         :return: True if there is no error, else False.
         """
         if output.shape != y.shape:
             print("_compute_loss: output shape is not y shape")
-            return False
-        self._loss = self._loss_func_list["forward"](output, y)
+            return None
 
-        return True
+        loss = self._loss_func_list["forward"](output, y)
+
+        return loss
 
     def _backward(self, X, y):
         """Backward function of nn model
@@ -104,29 +114,74 @@ class NnModel:
 
         return True
 
-    def fit(self, X, y, num_of_iterations):
+    def evaluation(self, X, y):
+        output = self._forward(X, train=False)
+        if output is None:
+            print("evaluation: _forward is wrong")
+            return None
+
+        loss = self._compute_loss(output, y)
+        if loss is None:
+            print("evaluation: _compute_loss is wrong")
+            return None
+
+        return loss
+
+    def fit(self, X_train, y_train, X_valid, y_valid, num_of_iterations, verbose=False):
         """Fit the model according to input X and label y.
 
-        :param X: input data.
-        :param y: labels.
+        :param X_train: input train data.
+        :param X_valid: input valid data.
+        :param y_train: train labels.
+        :param y_valid: valid labels.
         :param num_of_iterations: self-define num of iterations.
+        :param verbose: whether to show the training process.
         :return: True if there is no error, else False.
         """
-        if X.shape[1] != self._input_dim or y.shape[1] != self._output_dim:
+        if X_train.shape[1] != self._input_dim or y_train.shape[1] != self._output_dim \
+                or X_valid.shape[1] != self._input_dim or y_valid.shape[1] != self._output_dim:
             print("fit: input/output array dimension error")
             return False
 
+        train_loss_list = []
+        valid_loss_list = []
+
+        valid_loss = self.evaluation(X_valid, y_valid)
+        print("fit: validation loss at begin: {}".format(valid_loss))
+
         for _ in range(num_of_iterations):
-            if not self._forward(X):
+            if self._forward(X_train) is None:
                 print("fit: _forward wrong")
                 return False
 
-            if not self._compute_loss(self._output_layer, y):
+            if self._compute_loss(self._output_layer, y_train) is None:
                 print("fit: _comput_loss wrong")
                 return False
 
-            if not self._backward(X, y):
+            if not self._backward(X_train, y_train):
                 print("fit: _backward wrong")
                 return False
 
-            print(self._loss)
+            if _ % 50 == 0 or _ == num_of_iterations - 1:
+                train_loss = self._compute_loss(self._output_layer, y_train)
+                if train_loss is None:
+                    print("fit: _compute_loss is wrong")
+                    continue
+
+                valid_loss = self.evaluation(X_valid, y_valid)
+                if valid_loss is None:
+                    print("fit: _compute_loss is wrong")
+                    continue
+
+                valid_loss_list.append(valid_loss)
+                train_loss_list.append(train_loss)
+
+                print("iteration {}, train loss: {}, valid_loss: {}".format(_, train_loss, valid_loss))
+
+        if verbose:
+            from matplotlib import pyplot as plt
+            # plt.ylim(-10, 10)
+            plt.plot(train_loss_list, label="train_loss")
+            plt.plot(valid_loss_list, label="valid_loss")
+            plt.legend()
+            plt.show()

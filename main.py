@@ -10,25 +10,24 @@ File: main.py
 Author: liyang(gmlyytt@outlook.com)
 Date: 2019/12/14 10:17:50
 """
-import numpy as np
 from model import NnModel
+from data import load_data
 
 # training params
 LEARNING_RATE = 0.1
-NUM_OF_ITERATIONS = 200
+NUM_OF_ITERATIONS = 2000
 
 # data params
-INPUT_DIM = 2
-OUTPUT_DIM = 1
-NUM_OF_DATA = 50
+INPUT_DIM = 500
+OUTPUT_DIM = 3
+NUM_OF_DATA = 50000
 
 
 def run_app():
     nn = NnModel(LEARNING_RATE, INPUT_DIM, OUTPUT_DIM)
-    X = np.random.rand(NUM_OF_DATA, INPUT_DIM)
-    y = np.random.randint(0, 2, [NUM_OF_DATA, OUTPUT_DIM])
+    X_train, X_test, y_train, y_test = load_data(INPUT_DIM, OUTPUT_DIM, NUM_OF_DATA)
 
-    nn.fit(X, y, NUM_OF_ITERATIONS)
+    nn.fit(X_train, y_train, X_test, y_test, NUM_OF_ITERATIONS, verbose=True)
 
 
 if __name__ == '__main__':
