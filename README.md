@@ -23,11 +23,11 @@ This is a self-define NN predicting model. It will be a good reference to new le
         
         Computation of the gradient of weight matrix is shown as follows.
         
-        <div align=center><img width="529" height="194" src="https://github.com/gmlyytt-YANG/img-repo/blob/master/csdn/%E9%97%A8%E5%A4%96%E6%B1%89%E5%85%A5%E9%97%A8DL%20--%20%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E6%8E%A8%E5%AF%BC%E5%8F%8Apython%E5%AE%9E%E7%8E%B0/nn_plot_bp.png"/></div>
+        <div align=center><img width="634" height="232" src="https://github.com/gmlyytt-YANG/img-repo/blob/master/csdn/%E9%97%A8%E5%A4%96%E6%B1%89%E5%85%A5%E9%97%A8DL%20--%20%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E6%8E%A8%E5%AF%BC%E5%8F%8Apython%E5%AE%9E%E7%8E%B0/nn_plot_bp.png"/></div>
  
         Computation of the gradient of sigmoid output is shown as follows.
         
-        <div align=center><img width="396" height="242" src="https://github.com/gmlyytt-YANG/img-repo/blob/master/csdn/%E9%97%A8%E5%A4%96%E6%B1%89%E5%85%A5%E9%97%A8DL%20--%20%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E6%8E%A8%E5%AF%BC%E5%8F%8Apython%E5%AE%9E%E7%8E%B0/nn_plot_bp_2.png"/></div>
+        <div align=center><img width="356" height="217" src="https://github.com/gmlyytt-YANG/img-repo/blob/master/csdn/%E9%97%A8%E5%A4%96%E6%B1%89%E5%85%A5%E9%97%A8DL%20--%20%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E6%8E%A8%E5%AF%BC%E5%8F%8Apython%E5%AE%9E%E7%8E%B0/nn_plot_bp_2.png"/></div>
     
 - **bonus**
     
