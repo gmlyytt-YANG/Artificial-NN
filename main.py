@@ -11,23 +11,28 @@ Author: liyang(gmlyytt@outlook.com)
 Date: 2019/12/14 10:17:50
 """
 from model import NnModel
-from data import load_data
+from data_loader import DataLoader
 
 # training params
-LEARNING_RATE = 0.1
-NUM_OF_ITERATIONS = 2000
-
-# data params
-INPUT_DIM = 500
-OUTPUT_DIM = 3
-NUM_OF_DATA = 50000
+LEARNING_RATE = 0.01
+NUM_OF_ITERATIONS = 20000
 
 
 def run_app():
-    nn = NnModel(LEARNING_RATE, INPUT_DIM, OUTPUT_DIM)
-    X_train, X_test, y_train, y_test = load_data(INPUT_DIM, OUTPUT_DIM, NUM_OF_DATA)
+    data_loader = DataLoader("random")
 
-    nn.fit(X_train, y_train, X_test, y_test, NUM_OF_ITERATIONS, verbose=True)
+    nn = NnModel(LEARNING_RATE,
+                 data_loader.train_evaluation_param["input_dim"],
+                 data_loader.train_evaluation_param["output_dim"],
+                 layer_unit_num_list=[5, 3],
+                 activation_method="sigmoid",
+                 loss_method="square",
+                 regularization_param={"alpha": 0.3, "mode": "l2"},
+                 weight_update_param={"mode": "momentum", "alpha": 0.01})
+
+    nn.fit(data_loader.train_evaluation_data,
+           num_of_iterations=NUM_OF_ITERATIONS,
+           verbose=True)
 
 
 if __name__ == '__main__':

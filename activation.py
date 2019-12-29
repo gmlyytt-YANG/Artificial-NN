@@ -14,19 +14,34 @@ Date: 2019/12/14 09:40:50
 import numpy as np
 
 
-def sigmoid(X):
-    """Sigmoid function.
+class ActivationLoader:
+    def __init__(self, activation_source):
+        self.activation_func_list = None
+        self._generate_activation_func(activation_source)
 
-    :param X: input.
-    :return: sigmoid output.
-    """
-    return 1.0 / (1.0 + np.exp(-X))
+    def _generate_activation_func(self, activation_source):
+        if activation_source == "sigmoid":
+            self.activation_func_list = {
+                "forward": self.sigmoid,
+                "backward": self.sigmoid_derivative
+            }
+        else:
+            pass
 
+    @staticmethod
+    def sigmoid(X):
+        """Sigmoid function.
 
-def sigmoid_derivative(X):
-    """Sigmoid derivative function.
+        :param X: input.
+        :return: sigmoid output.
+        """
+        return 1.0 / (1.0 + np.exp(-X))
 
-    :param X: input.
-    :return: sigmoid derivative output.
-    """
-    return sigmoid(X) * (1 - sigmoid(X))
+    @staticmethod
+    def sigmoid_derivative(X):
+        """Sigmoid derivative function.
+
+        :param X: input.
+        :return: sigmoid derivative output.
+        """
+        return ActivationLoader.sigmoid(X) * (1 - ActivationLoader.sigmoid(X))

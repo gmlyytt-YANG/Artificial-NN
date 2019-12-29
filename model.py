@@ -12,10 +12,12 @@ Date: 2019/12/14 09:40:50
 """
 
 import numpy as np
+from collections import defaultdict
 
-from activation import sigmoid, sigmoid_derivative
-from loss import square_loss, square_loss_derivative
-from regularization import regularization
+from activation import ActivationLoader
+from loss import LossLoader
+from regularization import Regularization
+from weight_update import WeightUpdate
 
 
 class NnModel:
@@ -23,30 +25,41 @@ class NnModel:
                  learning_rate,
                  input_dim,
                  output_dim,
-                 hidden_layer_unit_num=3):
+                 layer_unit_num_list=None,
+                 activation_method="sigmoid",
+                 loss_method="square",
+                 regularization_param=None,
+                 weight_update_param=None):
         self._learning_rate = learning_rate if learning_rate is not None else 0
-
         self._input_dim = input_dim if input_dim is not None else 3
         self._output_dim = output_dim if output_dim is not None else 1
 
-        self._hidden_layer_w = np.random.rand(self._input_dim, hidden_layer_unit_num)
-        self._hidden_layer_before_activation = None
-        self._hidden_layer = None
+        if layer_unit_num_list is None:
+            layer_unit_num_list = [5, 3]
+        layer_unit_num_list.append(output_dim)
+        self.layer_unit_num_list = layer_unit_num_list
 
-        self._output_layer_w = np.random.rand(hidden_layer_unit_num, self._output_dim)
-        self._output_layer_before_activation = None
-        self._output_layer = None
+        self.layer_num = len(self.layer_unit_num_list)
 
-        self._activation_func_list = {
-            "forward": sigmoid,
-            "backward": sigmoid_derivative
-        }
+        self._layers = defaultdict()
+        self._outputs = defaultdict()
 
         self._loss = None
-        self._loss_func_list = {
-            "forward": square_loss,
-            "backward": square_loss_derivative
-        }
+        self._regularization_param = regularization_param
+        self._weight_update_param = weight_update_param
+
+        self._generate_network_structure()
+        self._activation_func_list = ActivationLoader(activation_method).activation_func_list
+        self._loss_func_list = LossLoader(loss_method).loss_func_list
+
+    def _generate_network_structure(self):
+        for layer_index in range(self.layer_num):
+            input_dim = self._input_dim if layer_index == 0 else self.layer_unit_num_list[layer_index - 1]
+
+            self._layers["weight_{}".format(layer_index)] = np.random.rand(input_dim,
+                                                                           self.layer_unit_num_list[layer_index])
+            # if self._weight_update_param["mode"] == "momentum":
+            #     self._layers["weight_{}_v".format(layer_index)] = np.zeros([input_dim, self.layer_num[layer_index]])
 
     def _forward(self, X, train=True):
         """Forward function of nn model, which computes the output of the nn model.
@@ -57,20 +70,21 @@ class NnModel:
         """
         if X.shape[1] != self._input_dim:
             print("_forward: input array dimension error")
-            return None
+            return None, False
 
-        hidden_layer_before_activation = np.dot(X, self._hidden_layer_w)
-        hidden_layer = self._activation_func_list["forward"](hidden_layer_before_activation)
-        output_layer_before_activation = np.dot(hidden_layer, self._output_layer_w)
-        output_layer = self._activation_func_list["forward"](output_layer_before_activation)
+        outputs = defaultdict()
+        for layer_index in range(self.layer_num):
+            input_data = X if layer_index == 0 else outputs["output_{}".format(layer_index - 1)]
+            outputs["output_before_activation_{}".format(layer_index)] = \
+                np.dot(input_data, self._layers["weight_{}".format(layer_index)])
+            outputs["output_{}".format(layer_index)] = \
+                self._activation_func_list["forward"](outputs["output_before_activation_{}".format(layer_index)])
 
         if train:
-            self._hidden_layer_before_activation = hidden_layer_before_activation
-            self._hidden_layer = hidden_layer
-            self._output_layer_before_activation = output_layer_before_activation
-            self._output_layer = output_layer
+            self._outputs = outputs
+            return None, True
 
-        return output_layer
+        return outputs["output_{}".format(self.layer_num - 1)], True
 
     def _compute_loss(self, output, y):
         """Compute loss
@@ -87,45 +101,53 @@ class NnModel:
 
         return loss
 
-    def _backward(self, X, y, regularization_option="l2", alpha=0.3):
+    def _backward(self, X, y):
         """Backward function of nn model
 
         :param X:
         :param y:
-        :param regularization_option: mode of regularization,
-               "l2" means l2-regularization, "l1" means l1-regularization.
         :return: True if there is no error, else False.
         """
-        if self._output_layer.shape != y.shape:
+        if self._outputs["output_{}".format(self.layer_num - 1)].shape != y.shape:
             print("_backward_loss: self._output_layer.shape != y.shape")
             return False
-        d_loss_d_output_layer = self._loss_func_list["backward"](self._output_layer, y)
 
-        d_loss_d_output_layer_before_activation = \
-            self._activation_func_list["backward"](self._output_layer_before_activation) * d_loss_d_output_layer
+        d_outputs = defaultdict()
+        d_layers = defaultdict()
 
-        d_loss_d_output_layer_w = np.dot(self._hidden_layer.T, d_loss_d_output_layer_before_activation)
-        d_loss_d_hidden_layer = np.dot(d_loss_d_output_layer_before_activation, self._output_layer_w.T)
+        for layer_index in range(self.layer_num - 1, -1, -1):
+            # compute gradients
+            if layer_index == self.layer_num - 1:
+                d_outputs["output_{}".format(layer_index)] = self._loss_func_list["backward"](
+                    self._outputs["output_{}".format(layer_index)], y)
+            else:
+                d_outputs["output_{}".format(layer_index)] = \
+                    np.dot(d_outputs["output_before_activation_{}".format(layer_index + 1)],
+                           self._layers["weight_{}".format(layer_index + 1)].T)
 
-        d_loss_d_hidden_layer_before_activation = \
-            self._activation_func_list["backward"](self._hidden_layer_before_activation) * d_loss_d_hidden_layer
+            d_outputs["output_before_activation_{}".format(layer_index)] = \
+                self._activation_func_list["forward"](
+                    self._outputs["output_before_activation_{}".format(layer_index)]) * d_outputs[
+                    "output_{}".format(layer_index)]
 
-        d_loss_d_hidden_layer_w = np.dot(X.T, d_loss_d_hidden_layer_before_activation)
+            input_for_weight = X if layer_index == 0 else self._outputs["output_{}".format(layer_index - 1)]
+            d_layers["weight_{}".format(layer_index)] = np.dot(input_for_weight.T, d_outputs[
+                "output_before_activation_{}".format(layer_index)])
 
-        regularization_output_layer_w = regularization(self._output_layer_w, regularization_option)
-        regularization_hidden_layer_w = regularization(self._hidden_layer_w, regularization_option)
+            # regularization
+            d_layers["weight_{}".format(layer_index)] += \
+                Regularization(self._regularization_param).regularization_func(
+                    self._layers["weight_{}".format(layer_index)])
 
-        self._output_layer_w -= self._learning_rate * (d_loss_d_output_layer_w + alpha * regularization_output_layer_w)
-        self._hidden_layer_w -= self._learning_rate * (d_loss_d_hidden_layer_w + alpha * regularization_hidden_layer_w)
+            # update parameters
+            self._layers["weight_{}".format(layer_index)] = WeightUpdate(self._weight_update_param).weight_update_func(
+                self._layers["weight_{}".format(layer_index)], d_layers["weight_{}".format(layer_index)],
+                self._learning_rate, name="weight_{}".format(layer_index))
 
         return True
 
     def evaluation(self, X, y):
-        output = self._forward(X, train=False)
-        if output is None:
-            print("evaluation: _forward is wrong")
-            return None
-
+        output = self.predict(X)
         loss = self._compute_loss(output, y)
         if loss is None:
             print("evaluation: _compute_loss is wrong")
@@ -133,17 +155,25 @@ class NnModel:
 
         return loss
 
-    def fit(self, X_train, y_train, X_valid, y_valid, num_of_iterations, verbose=False):
+    def predict(self, X):
+        output, succ = self._forward(X, train=False)
+        if not succ:
+            print("evaluation: _forward is wrong")
+            return None
+
+        return output
+
+    def fit(self, data_dict, num_of_iterations, early_stopping_iter=300, verbose=False):
         """Fit the model according to input X and label y.
 
-        :param X_train: input train data.
-        :param X_valid: input valid data.
-        :param y_train: train labels.
-        :param y_valid: valid labels.
+        :param data_dict:
         :param num_of_iterations: self-define num of iterations.
+        :param early_stopping_iter:
         :param verbose: whether to show the training process.
         :return: True if there is no error, else False.
         """
+        X_train, y_train, X_valid, y_valid = \
+            data_dict["X_train"], data_dict["y_train"], data_dict["X_evaluation"], data_dict["y_evaluation"]
         if X_train.shape[1] != self._input_dim or y_train.shape[1] != self._output_dim \
                 or X_valid.shape[1] != self._input_dim or y_valid.shape[1] != self._output_dim:
             print("fit: input/output array dimension error")
@@ -155,26 +185,36 @@ class NnModel:
         valid_loss = self.evaluation(X_valid, y_valid)
         print("fit: validation loss at begin: {}".format(valid_loss))
 
-        for _ in range(num_of_iterations):
-            if self._forward(X_train) is None:
+        min_valid_loss = 100000000
+        iter_tolerate = 0
+        for index in range(num_of_iterations):
+            _, succ = self._forward(X_train)
+            if not succ:
                 print("fit: _forward wrong")
                 return False
 
-            if self._compute_loss(self._output_layer, y_train) is None:
+            train_loss = self._compute_loss(self._outputs["output_{}".format(self.layer_num - 1)], y_train)
+            if train_loss is None:
                 print("fit: _comput_loss wrong")
                 return False
 
-            if not self._backward(X_train, y_train, regularization_option="l1"):
+            if not self._backward(X_train, y_train):
                 print("fit: _backward wrong")
                 return False
 
-            if _ % 50 == 0 or _ == num_of_iterations - 1:
-                train_loss = self._compute_loss(self._output_layer, y_train)
-                if train_loss is None:
-                    print("fit: _compute_loss is wrong")
-                    continue
+            valid_loss = self.evaluation(X_valid, y_valid)
 
-                valid_loss = self.evaluation(X_valid, y_valid)
+            # early_stopping
+            if valid_loss >= min_valid_loss:
+                if iter_tolerate >= early_stopping_iter:
+                    print("iteration {} fit: has arrived limitation of early stopping in", index)
+                    break
+                else:
+                    iter_tolerate += 1
+            else:
+                min_valid_loss = valid_loss
+
+            if index % 50 == 0 or index == num_of_iterations - 1:
                 if valid_loss is None:
                     print("fit: _compute_loss is wrong")
                     continue
@@ -182,7 +222,7 @@ class NnModel:
                 valid_loss_list.append(valid_loss)
                 train_loss_list.append(train_loss)
 
-                print("iteration {}, train loss: {}, valid_loss: {}".format(_, train_loss, valid_loss))
+                print("iteration {}, train loss: {}, valid_loss: {}".format(index, train_loss, valid_loss))
 
         if verbose:
             from matplotlib import pyplot as plt
