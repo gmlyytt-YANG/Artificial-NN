@@ -207,7 +207,7 @@ class NnModel:
             # early_stopping
             if valid_loss >= min_valid_loss:
                 if iter_tolerate >= early_stopping_iter:
-                    print("iteration {} fit: has arrived limitation of early stopping in", index)
+                    print("iteration {} fit: arrive limitation of early stopping".format(index))
                     break
                 else:
                     iter_tolerate += 1
